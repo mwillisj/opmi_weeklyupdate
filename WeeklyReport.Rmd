@@ -1,0 +1,103 @@
+---
+title: "WeeklyUpdate"
+author: "Megan Willis-Jackson"
+date: "2022-08-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(here)
+library(readxl)
+library(lubridate)
+library(ggplot2)
+
+```
+
+
+```{r}
+gated_line <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.02 MBTA Gated Station Validations by line 2018-22.csv") %>%
+  mutate(servicedate = mdy(servicedate))
+
+gated_baselines <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/Weekly Updates/Daily One-Page Update 2022.08.03.xlsx", sheet = "Baselines") %>%
+  filter(month == month(max(gated_line$servicedate)))
+
+
+```
+
+
+```{r}
+wk_end <- Sys.Date() - wday(Sys.Date() + 1) - 7 # for current data remove this minus 7
+wk_start <- Sys.Date() - wday(Sys.Date() + 5) - 7  # for current data remove this minus 7
+
+baselines <- gated_baselines %>%
+  pivot_wider(names_from = "route_or_line",
+              id_cols = "month",
+              values_from = "avg_validations") %>%
+  mutate(`Total Gated Stations` = `Blue Line` + `Green Line` + `Red Line` + `Orange Line` + `Silver Line`,
+         month = "baseline")
+
+
+current_week <- gated_line %>%
+  pivot_wider(names_from = "route_or_line", 
+              id_cols = "servicedate", values_from = "validations") %>%
+  mutate(`Total Gated Stations` = `Blue Line` + `Green Line` + `Red Line` + `Orange Line` + `Silver Line`) %>%
+  filter(servicedate <= wk_end & servicedate >= wk_start) %>%
+  summarise(`Blue Line` = mean(`Blue Line`),
+            `Green Line` = mean(`Green Line`),
+            `Orange Line` = mean(`Orange Line`),
+            `Red Line` = mean(`Red Line`),
+            `Silver Line` = mean(`Silver Line`),
+            `Total Gated Stations` = mean(`Total Gated Stations`)) %>%
+  mutate(month = "current") %>%
+  rbind(baselines) %>%
+  pivot_longer(cols = c("Blue Line","Green Line","Orange Line","Red Line","Silver Line","Total Gated Stations" ),
+               names_to = "Line") %>%
+  pivot_wider(names_from = "month",
+              id_cols = "Line",
+              values_from = "value") %>%
+  mutate(pct_decrease = (current-baseline)/baseline)
+
+
+gated_chart <- gated_line %>%
+  pivot_wider(names_from = "route_or_line", 
+              id_cols = "servicedate", values_from = "validations") %>%
+  mutate(`Total Gated Stations` = `Blue Line` + `Green Line` + `Red Line` + `Orange Line` + `Silver Line`) %>%
+  filter(servicedate <= wk_end & servicedate >= (wk_end-60))
+
+
+
+```
+
+
+# Plot
+
+```{r}
+ggplot(gated_chart) +
+  geom_line(aes(x = servicedate,
+                y = `Total Gated Stations`)) +
+  geom_point(aes(x = servicedate,
+                 y = `Total Gated Stations`))
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
