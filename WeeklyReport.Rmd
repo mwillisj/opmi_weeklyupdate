@@ -11,6 +11,10 @@ library(here)
 library(readxl)
 library(lubridate)
 library(ggplot2)
+library(extrafont)
+library(plyr)
+loadfonts(device = "win")
+options(scipen = 999)
 
 ```
 
@@ -72,12 +76,66 @@ gated_chart <- gated_line %>%
 
 # Plot
 
+opmi_rl = "#DA291C",
+    opmi_ol = "#ED8B00",
+    opmi_gl = "#00843D",
+    opmi_bl = "#003DA5",
+    opmi_bus = "#FFC72C",
+    opmi_ferry = "#008EAA",
+    opmi_cr = "#80276C",
+    opmi_sl = "#7C878E",
+    opmi_ride = "#52BBc5",
+    opmi_subway = "#4A4F5C"
+
 ```{r}
-ggplot(gated_chart) +
+gated_station_chart <- function(data = "gated_chart", servicedate = "servicedate", line, line_color){
+  
+  ggplot(data) +
   geom_line(aes(x = servicedate,
-                y = `Total Gated Stations`)) +
+                y = .data[[line]]), 
+            color = ifelse(line_color == "red",
+                           "#DA291C",
+                    ifelse(line_color == "orange",
+                           "#ED8B00",
+                    ifelse(line_color == "green",
+                           "#00843D",
+                    ifelse(line_color == "blue",
+                           "#003DA5", "#4A4F5C"))))) +
   geom_point(aes(x = servicedate,
-                 y = `Total Gated Stations`))
+                 y = .data[[line]]), 
+            color = ifelse(line_color == "red",
+                           "#DA291C",
+                    ifelse(line_color == "orange",
+                           "#ED8B00",
+                    ifelse(line_color == "green",
+                           "#00843D",
+                    ifelse(line_color == "blue",
+                           "#003DA5", "#4A4F5C"))))) +
+  scale_x_date(name = NULL,
+               date_labels = "%m/%d",
+               date_breaks = "1 week",
+               limits = c(min(data[[servicedate]]),max(data[[servicedate]]))) +
+  scale_y_continuous(name = NULL,
+                     breaks = brks <- seq(0, 
+                                          round_any(max(data[[line]]),
+                                                    accuracy = 100000,
+                                                    f = ceiling), 
+                                          by = round_any(max(data[[line]]),
+                                                    accuracy = 100000,
+                                                    f = ceiling)/6),
+                     labels = paste(prettyNum(brks, big.mark = ",")),
+                     limits = c(0, max(brks))) +
+  theme(text = element_text(family = "Calibri"),
+        panel.background = element_blank(), 
+        panel.grid.major.y = element_line(color = "grey89"),
+        panel.grid.major.x = element_blank(),
+        axis.ticks.y = element_blank())
+
+ ggsave("totalgated.jpg", height = 3.5, width = 7)
+  
+}
+
+gated_station_chart(gated_chart, line = "Total Gated Stations", line_color = "black")
 
 
 
