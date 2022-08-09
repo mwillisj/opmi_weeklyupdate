@@ -2,7 +2,7 @@
 title: "WeeklyUpdate"
 author: "Megan Willis-Jackson"
 date: "2022-08-08"
-output: html_document
+output: powerpoint_presentation
 ---
 
 ```{r setup, include=FALSE}
@@ -19,7 +19,7 @@ options(scipen = 999)
 ```
 
 
-```{r}
+```{r, echo=F}
 gated_line <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.02 MBTA Gated Station Validations by line 2018-22.csv") %>%
   mutate(servicedate = mdy(servicedate))
 
@@ -30,7 +30,7 @@ gated_baselines <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/R
 ```
 
 
-```{r}
+```{r, echo=F}
 wk_end <- Sys.Date() - wday(Sys.Date() + 1) - 7 # for current data remove this minus 7
 wk_start <- Sys.Date() - wday(Sys.Date() + 5) - 7  # for current data remove this minus 7
 
@@ -87,7 +87,7 @@ opmi_rl = "#DA291C",
     opmi_ride = "#52BBc5",
     opmi_subway = "#4A4F5C"
 
-```{r}
+```{r, echo=F}
 gated_station_chart <- function(data = "gated_chart", servicedate = "servicedate", line){
   
   seq_max <- ifelse(line == "Red Line",
@@ -149,7 +149,7 @@ gated_station_chart <- function(data = "gated_chart", servicedate = "servicedate
         panel.grid.major.x = element_blank(),
         axis.ticks.y = element_blank(), plot.title = element_text(hjust = .5, face = "bold"))
 
-#ggsave(paste(line,".jpg", sep = ""), height = 3.5, width = 7)
+ggsave(paste(line,".jpg", sep = ""), height = 3.5, width = 7)
   
 }
 
