@@ -2,11 +2,8 @@
 title: "WeeklyUpdate"
 author: "Megan Willis-Jackson"
 date: "2022-08-08"
-output:
-  powerpoint_presentation: default
-  slidy_presentation: default
-  ioslides_presentation: default
-  beamer_presentation: default
+
+
 ---
 
 ```{r setup, include=FALSE}
@@ -28,20 +25,22 @@ options(scipen = 999)
 ```
 
 
-```{r, echo=F}
+```{r, echo=F, message=F, error=F, warning=F}
 gated_line <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.10 MBTA Gated Station Validations by line 2018-22.csv") %>%
   mutate(servicedate = mdy(servicedate))
 
-gated_baselines <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/Weekly Updates/Daily One-Page Update 2022.08.03.xlsx", sheet = "Baselines") %>%
+gated_baselines <- read_excel("gated_line_summary.xlsx", sheet = "Baselines") %>%
   filter(month == month(max(gated_line$servicedate)))
+
+gated_station <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.10 MBTA Gated Station Validations by station 2018-22.csv")
 
 
 ```
 
 
-```{r, echo=F}
-wk_end <- Sys.Date() - wday(Sys.Date() + 1)  # for current data remove this minus 7
-wk_start <- Sys.Date() - wday(Sys.Date() + 5)   # for current data remove this minus 7
+```{r, echo=F, message=F, error=F, warning=F}
+wk_end <- Sys.Date() - wday(Sys.Date() + 1) - 7  # for current data remove this minus 7, consider just manually typing the date here
+wk_start <- Sys.Date() - wday(Sys.Date() + 5) - 14   # for current data remove this minus 7
 
 baselines <- gated_baselines %>%
   pivot_wider(names_from = "route_or_line",
@@ -50,11 +49,14 @@ baselines <- gated_baselines %>%
   mutate(`Total Gated Stations` = `Blue Line` + `Green Line` + `Red Line` + `Orange Line` + `Silver Line`,
          month = "baseline")
 
-
-current_week <- gated_line %>%
+# update the Daily One-Page Update
+line_summary <- gated_line %>%
   pivot_wider(names_from = "route_or_line", 
               id_cols = "servicedate", values_from = "validations") %>%
   mutate(`Total Gated Stations` = `Blue Line` + `Green Line` + `Red Line` + `Orange Line` + `Silver Line`) %>%
+  filter(servicedate >= mdy("3-16-2020"))
+
+current_week <- line_summary %>%
   filter(servicedate <= wk_end & servicedate >= wk_start) %>%
   summarise(`Blue Line` = mean(`Blue Line`),
             `Green Line` = mean(`Green Line`),
@@ -79,6 +81,15 @@ gated_chart <- gated_line %>%
   filter(servicedate <= wk_end & servicedate >= (wk_end-60))
 
 
+wb <- loadWorkbook("gated_line_summary.xlsx")
+writeData(wb, sheet = "Line Summary", x = line_summary, startRow = 3, colNames = F)
+writeData(wb, sheet = "60-days", x = gated_chart)
+saveWorkbook(wb, 
+             paste("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/Weekly Updates/Daily One-Page Update ", 
+                   format(Sys.Date()-6,"%Y.%m.%d"), ".xlsx", sep = ""), 
+             overwrite = T)
+
+
 
 ```
 
@@ -86,7 +97,7 @@ gated_chart <- gated_line %>%
 
 
 
-```{r, echo=F}
+```{r, echo=F, message=F, error=F, warning=F}
 
 # colors for MBTA
 # opmi_rl = "#DA291C",
@@ -185,7 +196,7 @@ knitr::include_graphics(paste(line,".jpg",sep = ""))
 
 
 
-```{r, echo=F, out.width = "80%"}
+```{r, echo=F, message=F, error=F, warning=F}
 gated_station_chart(gated_chart, line = "Total Gated Stations")
 
 # knitr::include_graphics("Total Gated Stations.jpg")
@@ -196,7 +207,7 @@ gated_station_chart(gated_chart, line = "Total Gated Stations")
 
 # Gated Rapid Transit Stations (Detail)
 
-```{r, echo=F}
+```{r, echo=F, message=F, error=F, warning=F}
 
 gated_station_chart(gated_chart, line = "Red Line")
 gated_station_chart(gated_chart, line = "Orange Line")
@@ -210,7 +221,7 @@ gated_station_chart(gated_chart, line = "Green Line")
 # Bus Ridership
 
 
-```{r}
+```{r, echo=F, message=F, error=F, warning=F}
 bus_raw <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/bus updates/Daily bus ridership_v4_080922 (1).xlsx", 
                       sheet = "Weekly_RteRiders_Output", skip = 4) %>%
   .[,1:13] %>%
@@ -225,6 +236,7 @@ bus_raw <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership
 wb <- loadWorkbook("bus_template.xlsx")
 writeData(wb, sheet = "Ridership by Route", x = bus_raw, startRow = 3)
 saveWorkbook(wb, "C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/Weekly Bus Ridership Prep Files/Old Files/Weekly_Bus_Ridership_by_Route_2022.08.10.xlsx", overwrite = T)
+#need to replace 999999 with 'N/A' after exporting to Excel
 
 
 
