@@ -2,25 +2,34 @@
 title: "WeeklyUpdate"
 author: "Megan Willis-Jackson"
 date: "2022-08-08"
-output: html_document
+output:
+  powerpoint_presentation: default
+  slidy_presentation: default
+  ioslides_presentation: default
+  beamer_presentation: default
 ---
 
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(here)
 library(readxl)
+library(xlsx)
+library(openxlsx)
 library(lubridate)
 library(ggplot2)
 library(extrafont)
 library(plyr)
+library(dplyr)
+library(jpeg)
+# library(officer)
 loadfonts(device = "win")
 options(scipen = 999)
 
 ```
 
 
-```{r}
-gated_line <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.02 MBTA Gated Station Validations by line 2018-22.csv") %>%
+```{r, echo=F}
+gated_line <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.10 MBTA Gated Station Validations by line 2018-22.csv") %>%
   mutate(servicedate = mdy(servicedate))
 
 gated_baselines <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/Weekly Updates/Daily One-Page Update 2022.08.03.xlsx", sheet = "Baselines") %>%
@@ -30,9 +39,9 @@ gated_baselines <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/R
 ```
 
 
-```{r}
-wk_end <- Sys.Date() - wday(Sys.Date() + 1) - 7 # for current data remove this minus 7
-wk_start <- Sys.Date() - wday(Sys.Date() + 5) - 7  # for current data remove this minus 7
+```{r, echo=F}
+wk_end <- Sys.Date() - wday(Sys.Date() + 1)  # for current data remove this minus 7
+wk_start <- Sys.Date() - wday(Sys.Date() + 5)   # for current data remove this minus 7
 
 baselines <- gated_baselines %>%
   pivot_wider(names_from = "route_or_line",
@@ -74,20 +83,25 @@ gated_chart <- gated_line %>%
 ```
 
 
-# Plot
 
-opmi_rl = "#DA291C",
-    opmi_ol = "#ED8B00",
-    opmi_gl = "#00843D",
-    opmi_bl = "#003DA5",
-    opmi_bus = "#FFC72C",
-    opmi_ferry = "#008EAA",
-    opmi_cr = "#80276C",
-    opmi_sl = "#7C878E",
-    opmi_ride = "#52BBc5",
-    opmi_subway = "#4A4F5C"
 
-```{r}
+
+```{r, echo=F}
+
+# colors for MBTA
+# opmi_rl = "#DA291C",
+#     opmi_ol = "#ED8B00",
+#     opmi_gl = "#00843D",
+#     opmi_bl = "#003DA5",
+#     opmi_bus = "#FFC72C",
+#     opmi_ferry = "#008EAA",
+#     opmi_cr = "#80276C",
+#     opmi_sl = "#7C878E",
+#     opmi_ride = "#52BBc5",
+#     opmi_subway = "#4A4F5C"
+
+
+
 gated_station_chart <- function(data = "gated_chart", servicedate = "servicedate", line){
   
   seq_max <- ifelse(line == "Red Line",
@@ -136,7 +150,7 @@ gated_station_chart <- function(data = "gated_chart", servicedate = "servicedate
   scale_x_date(name = NULL,
                date_labels = "%m/%d",
                date_breaks = "1 week",
-               limits = c(min(data[[servicedate]]),max(data[[servicedate]]))) +
+               limits = c(min(data[[servicedate]]),max(data[[servicedate]])-1)) +
   scale_y_continuous(name = NULL,
                      breaks = brks <- seq(0, 
                                           seq_max, by = seq_by),
@@ -149,15 +163,15 @@ gated_station_chart <- function(data = "gated_chart", servicedate = "servicedate
         panel.grid.major.x = element_blank(),
         axis.ticks.y = element_blank(), plot.title = element_text(hjust = .5, face = "bold"))
 
-#ggsave(paste(line,".jpg", sep = ""), height = 3.5, width = 7)
+ggsave(paste(line,".jpg", sep = ""), height = 3.5, width = 7)
+knitr::include_graphics(paste(line,".jpg",sep = ""))
+
+
   
 }
 
-gated_station_chart(gated_chart, line = "Red Line")
-gated_station_chart(gated_chart, line = "Orange Line")
-gated_station_chart(gated_chart, line = "Blue Line")
-gated_station_chart(gated_chart, line = "Green Line")
-gated_station_chart(gated_chart, line = "Total Gated Stations")
+
+
 
 
 
@@ -167,14 +181,55 @@ gated_station_chart(gated_chart, line = "Total Gated Stations")
 ```
 
 
+# Gated Rapid Transit Stations
+
+
+
+```{r, echo=F, out.width = "80%"}
+gated_station_chart(gated_chart, line = "Total Gated Stations")
+
+# knitr::include_graphics("Total Gated Stations.jpg")
+
+```
+
+
+
+# Gated Rapid Transit Stations (Detail)
+
+```{r, echo=F}
+
+gated_station_chart(gated_chart, line = "Red Line")
+gated_station_chart(gated_chart, line = "Orange Line")
+gated_station_chart(gated_chart, line = "Blue Line")
+gated_station_chart(gated_chart, line = "Green Line")
+
+
+```
+
+
+# Bus Ridership
+
+
+```{r}
+bus_raw <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/bus updates/Daily bus ridership_v4_080922 (1).xlsx", 
+                      sheet = "Weekly_RteRiders_Output", skip = 4) %>%
+  .[,1:13] %>%
+  mutate(temp = case_when(`Adjusted Riders` == "N/A" ~ 999999,
+                          `Adjusted Riders` != "N/A" ~ round_any(as.numeric(`Adjusted Riders`),accuracy = 1, f = round)),
+         WeekStartDay = format(as.Date(ymd(WeekStartDay)), format = "%d-%m-%Y")) %>%
+  arrange(ROUTE) %>%
+  select(WeekStartDay, avl_routes, temp) %>%
+  pivot_wider(id_cols = avl_routes, names_from = WeekStartDay, values_from = temp) %>%
+  dplyr::rename(Route = avl_routes)
+
+wb <- loadWorkbook("bus_template.xlsx")
+writeData(wb, sheet = "Ridership by Route", x = bus_raw, startRow = 3)
+saveWorkbook(wb, "C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/Weekly Bus Ridership Prep Files/Old Files/Weekly_Bus_Ridership_by_Route_2022.08.10.xlsx", overwrite = T)
 
 
 
 
-
-
-
-
+```
 
 
 
