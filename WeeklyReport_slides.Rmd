@@ -13,6 +13,8 @@ library(lubridate)
 library(ggplot2)
 library(extrafont)
 library(plyr)
+library(jpeg)
+# library(officer)
 loadfonts(device = "win")
 options(scipen = 999)
 
@@ -74,20 +76,25 @@ gated_chart <- gated_line %>%
 ```
 
 
-# Plot
 
-opmi_rl = "#DA291C",
-    opmi_ol = "#ED8B00",
-    opmi_gl = "#00843D",
-    opmi_bl = "#003DA5",
-    opmi_bus = "#FFC72C",
-    opmi_ferry = "#008EAA",
-    opmi_cr = "#80276C",
-    opmi_sl = "#7C878E",
-    opmi_ride = "#52BBc5",
-    opmi_subway = "#4A4F5C"
+
 
 ```{r, echo=F}
+
+# colors for MBTA
+# opmi_rl = "#DA291C",
+#     opmi_ol = "#ED8B00",
+#     opmi_gl = "#00843D",
+#     opmi_bl = "#003DA5",
+#     opmi_bus = "#FFC72C",
+#     opmi_ferry = "#008EAA",
+#     opmi_cr = "#80276C",
+#     opmi_sl = "#7C878E",
+#     opmi_ride = "#52BBc5",
+#     opmi_subway = "#4A4F5C"
+
+
+
 gated_station_chart <- function(data = "gated_chart", servicedate = "servicedate", line){
   
   seq_max <- ifelse(line == "Red Line",
@@ -150,14 +157,13 @@ gated_station_chart <- function(data = "gated_chart", servicedate = "servicedate
         axis.ticks.y = element_blank(), plot.title = element_text(hjust = .5, face = "bold"))
 
 ggsave(paste(line,".jpg", sep = ""), height = 3.5, width = 7)
+
+
   
 }
 
-gated_station_chart(gated_chart, line = "Red Line")
-gated_station_chart(gated_chart, line = "Orange Line")
-gated_station_chart(gated_chart, line = "Blue Line")
-gated_station_chart(gated_chart, line = "Green Line")
-gated_station_chart(gated_chart, line = "Total Gated Stations")
+
+
 
 
 
@@ -167,8 +173,30 @@ gated_station_chart(gated_chart, line = "Total Gated Stations")
 ```
 
 
+# Gated Rapid Transit Stations
+
+```{r, echo=F}
+gated_station_chart(gated_chart, line = "Total Gated Stations")
 
 
+
+
+
+```
+
+![]("Users/Willis-JacksonM/OneDrive - Commonwealth of Massachusetts/RidershipDocumentation/R/opmi_weeklyupdate/Total Gated Stations.jpg")
+
+# Gated Rapid Transit Stations (Detail)
+
+```{r, echo=F}
+
+gated_station_chart(gated_chart, line = "Red Line")
+gated_station_chart(gated_chart, line = "Orange Line")
+gated_station_chart(gated_chart, line = "Blue Line")
+gated_station_chart(gated_chart, line = "Green Line")
+
+
+```
 
 
 
