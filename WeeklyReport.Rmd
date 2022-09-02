@@ -15,9 +15,11 @@ library(openxlsx)
 library(lubridate)
 library(ggplot2)
 library(extrafont)
-library(plyr)
+# library(plyr)
 library(dplyr)
 library(jpeg)
+library(zoo)
+library(ggalluvial)
 # library(officer)
 loadfonts(device = "win")
 options(scipen = 999)
@@ -26,21 +28,22 @@ options(scipen = 999)
 
 
 ```{r, echo=F, message=F, error=F, warning=F}
-gated_line <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.10 MBTA Gated Station Validations by line 2018-22.csv") %>%
+gated_line <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.31 MBTA Gated Station Validations by line 2018-22.csv") %>%
   mutate(servicedate = mdy(servicedate))
 
 gated_baselines <- read_excel("gated_line_summary.xlsx", sheet = "Baselines") %>%
   filter(month == month(max(gated_line$servicedate)))
 
-gated_station <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.10 MBTA Gated Station Validations by station 2018-22.csv")
+gated_station <- read.csv("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/2022.08.31 MBTA Gated Station Validations by station 2018-22.csv")
 
 
 ```
 
+# Gated Stations
 
 ```{r, echo=F, message=F, error=F, warning=F}
-wk_end <- Sys.Date() - wday(Sys.Date() + 1) - 7  # for current data remove this minus 7, consider just manually typing the date here
-wk_start <- Sys.Date() - wday(Sys.Date() + 5) - 14   # for current data remove this minus 7
+wk_end <- Sys.Date() - wday(Sys.Date() + 1)  # double check the date entered correctly, should work if Tues or Wed of following week
+wk_start <- Sys.Date() - wday(Sys.Date() + 5) - 7   
 
 baselines <- gated_baselines %>%
   pivot_wider(names_from = "route_or_line",
@@ -86,9 +89,8 @@ writeData(wb, sheet = "Line Summary", x = line_summary, startRow = 3, colNames =
 writeData(wb, sheet = "60-days", x = gated_chart)
 saveWorkbook(wb, 
              paste("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/Weekly Updates/Daily One-Page Update ", 
-                   format(Sys.Date()-6,"%Y.%m.%d"), ".xlsx", sep = ""), 
+                   format(Sys.Date(),"%Y.%m.%d"), ".xlsx", sep = ""), 
              overwrite = T)
-
 
 
 ```
@@ -222,11 +224,11 @@ gated_station_chart(gated_chart, line = "Green Line")
 
 
 ```{r, echo=F, message=F, error=F, warning=F}
-bus_raw <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/bus updates/Daily bus ridership_v4_080922 (1).xlsx", 
+bus_raw <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/bus updates/Daily bus ridership_v4_083022.xlsx", 
                       sheet = "Weekly_RteRiders_Output", skip = 4) %>%
   .[,1:13] %>%
   mutate(temp = case_when(`Adjusted Riders` == "N/A" ~ 999999,
-                          `Adjusted Riders` != "N/A" ~ round_any(as.numeric(`Adjusted Riders`),accuracy = 1, f = round)),
+                          `Adjusted Riders` != "N/A" ~ plyr::round_any(as.numeric(`Adjusted Riders`),accuracy = 1, f = round)),
          WeekStartDay = format(as.Date(ymd(WeekStartDay)), format = "%d-%m-%Y")) %>%
   arrange(ROUTE) %>%
   select(WeekStartDay, avl_routes, temp) %>%
@@ -235,7 +237,7 @@ bus_raw <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership
 
 wb <- loadWorkbook("bus_template.xlsx")
 writeData(wb, sheet = "Ridership by Route", x = bus_raw, startRow = 3)
-saveWorkbook(wb, "C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/Weekly Bus Ridership Prep Files/Old Files/Weekly_Bus_Ridership_by_Route_2022.08.10.xlsx", overwrite = T)
+saveWorkbook(wb, "C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/downloadable data for public/CSVs for public download/Weekly_Bus_Ridership_by_Route_2022.08.31.xlsx", overwrite = T)
 #need to replace 999999 with 'N/A' after exporting to Excel
 
 
@@ -246,6 +248,423 @@ saveWorkbook(wb, "C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVI
 
 
 
+# Commuter Rail
+## Overall Ridership tab
+
+```{r}
+cr_raw <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/CR Reports/08.31.2022 MASTER SHEET Commuter Rail by line ridership update for MBTA.xlsx",
+                     sheet = "TAB All Trains by Line Weekday") %>%
+  .[1:8, -1]
+
+
+cr_colnames <- colnames(cr_raw) %>%
+  as.data.frame() %>%
+  mutate(date1 = as.Date(as.numeric(.), origin = "1899-12-30"),
+         date2 = mdy(.))
+
+cr_colnames <- cr_colnames  %>%
+  mutate(date = as.Date(ifelse(is.na(cr_colnames$date1) == T, 
+                       cr_colnames$date2, 
+                       cr_colnames$date1), origin='1970-01-01')) %>%
+  filter(is.na(date) == F) 
+
+cr_colnames <- cr_colnames[,4]
+
+
+colnames(cr_raw) <- cr_colnames
+
+cr_overall <- rbind(colnames(cr_raw),
+                    cr_raw[4:6,]) %>%
+  as.data.frame() %>%
+  t() %>%
+  as.data.frame()
+
+colnames(cr_overall) <- c("Date","Baseline","Pct_baseline","Daily Ridership")
+
+cr_overall <- cr_overall %>%
+  mutate(Date = as.numeric(as.Date(Date) - as.Date(0, origin="1899-12-30", tz='UTC')),
+         Baseline = as.numeric(as.character(Baseline)),
+         Pct_baseline = as.numeric(as.character(Pct_baseline)),
+         `Daily Ridership` = as.numeric(as.character(`Daily Ridership`)),
+         `5-Day Rolling Avg` = rollmean(`Daily Ridership`, 5, fill = NA, align = 'right'))
+
+
+
+
+```
+
+## Previous weeks calculations
+
+```{r}
+cr_line_raw <- read_excel("C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/CR Reports/08.31.2022 MASTER SHEET Commuter Rail by line ridership update for MBTA.xlsx",
+                     sheet = "TAB All Trains by Line Weekday",
+                     skip = 11,
+                     col_names = F) %>%
+  .[1:13,]
+
+cr_rownames <- cr_line_raw$...1
+
+cr_line_raw <- cr_line_raw %>%
+  .[,-1]
+
+row.names(cr_line_raw) <- cr_rownames
+colnames(cr_line_raw) <- cr_colnames
+
+# function so can select number of weekdays to compare
+
+# create object first
+cr_comparison <- NULL
+
+cr_weeklycompare <- function(days = 5){
+
+lw_start <- colnames(cr_line_raw[,(ncol(cr_line_raw)-4)]) 
+lw_end <- colnames(cr_line_raw[,(ncol(cr_line_raw))+(days-5)])
+
+tw_start <- colnames(cr_line_raw[,(ncol(cr_line_raw)-9)]) 
+tw_end <- colnames(cr_line_raw[,(ncol(cr_line_raw)+(days-10))])
+  
+
+cr_last_week <- cr_line_raw[,(ncol(cr_line_raw)-4):(ncol(cr_line_raw)+(days-5))] 
+cr_last_week$last_week <- rowMeans(cr_last_week)
+row.names(cr_last_week) <- rownames(cr_line_raw)
+
+cr_two_weeks <- cr_line_raw[,(ncol(cr_line_raw)-9):(ncol(cr_line_raw)+(days-10))]
+cr_two_weeks$two_weeks_ago <- rowMeans(cr_two_weeks)
+row.names(cr_two_weeks) <- rownames(cr_line_raw)
+
+cr_comparison <- cbind(rownames(cr_last_week),
+                       cr_last_week$last_week, 
+                       cr_two_weeks$two_weeks_ago) %>%
+  as.data.frame() 
+row.names(cr_comparison) <- cr_rownames
+colnames(cr_comparison) <- c("line",
+                             "last_week",
+                             "two_weeks_ago")
+
+cr_comparison <- cr_comparison[order(row.names(cr_comparison)),] %>%
+  filter(is.na(last_week) == F) %>%
+  mutate(last_week = as.numeric(last_week),
+         two_weeks_ago = as.numeric(two_weeks_ago))
+
+colnames(cr_comparison) <- c("line",
+                             paste0(format(as.Date(lw_start), "%m/%d"),"-",
+                                    format(as.Date(lw_end), "%m/%d/%y")),
+                             "two_weeks_ago")
+
+cr_comparison <- return(cr_comparison)
+
+}
+
+
+cr_comparison <- cr_weeklycompare()
+
+
+
+wb <- loadWorkbook("cr_template_2022.08.xlsx")
+writeData(wb, sheet = "Overall ridership", x = cr_overall)
+writeData(wb, sheet = "Comparison", x = cr_comparison)
+saveWorkbook(wb, "C:/Users/Willis-JacksonM/Box/Ongoing Activities/Ridership/COVID-specific Work/CR Reports/CR data for weekly update.xlsx", overwrite = T)
+
+
+
+```
+
+# Orange Line Ridership Changes
+Analyzing ridership changes on potential OL alternatives (i.e., bus routes, CR)
+
+```{r}
+#get average daily ridership of weeks to be compared
+ol_dailyavg <- gated_line %>%
+  filter(route_or_line == "Orange Line",
+         servicedate >= "2022-08-01",
+         wday(servicedate) > 1 & wday(servicedate) < 7) %>%
+  mutate(ol_surge = case_when(servicedate >= "2022-08-19" ~ "surge",
+                              servicedate < "2022-08-19" ~ "pre-surge")) %>%
+  group_by(ol_surge) %>%
+  summarise(ol_avg = mean(validations)) %>%
+  mutate(ol_avg = case_when(ol_surge == "surge" ~ 0,
+                            ol_surge == "pre-surge" ~ ol_avg))
+
+
+
+#average ridership for bus alternatives
+#routes: 39, CT2, SL4/5, 41, 93
+
+bus_dailyavg <- bus_raw %>%
+  filter(Route %in% c("4","39","41","42","43","91","92","93","CT2","SL5","SL4")) %>%
+  .[,-1] %>%
+  t() %>%
+  as.data.frame()
+  # sapply(as.numeric) %>%
+  # .[189:190,] 
+  
+colnames(bus_dailyavg) <- c("4","39","41","42","43","91","92","93","CT2","SL5","SL4")
+bus_dailyavg$serviceweek <- rownames(bus_dailyavg) %>% as.Date(format = "%d-%m-%Y")
+  
+bus_dailyavg <- bus_dailyavg %>%
+  filter(serviceweek >= "2022-08-01") %>%
+  mutate(ol_surge = case_when(serviceweek >= "2022-08-19" ~ "surge",
+                              serviceweek < "2022-08-19" ~ "pre-surge")) %>%
+  group_by(ol_surge) %>%
+  summarise(`Rt 4` = mean(`4`),
+            `Rt 39` = mean(`39`),
+            `Rt 41` = mean(`41`),
+            `Rt 42` = mean(`42`),
+            `Rt 43` = mean(`43`),
+            `Rt 91` = mean(`91`),
+            `Rt 92` = mean(`92`),
+            `Rt 93` = mean(`93`),
+            `Rt CT2` = mean(CT2),
+            `SL5` = mean(SL5),
+            `SL4` = mean(SL4))
+  
+
+cr_dailyavg <- cr_line_raw %>%
+  t() %>%
+  as.data.frame()
+
+cr_dailyavg$servicedate <- row.names(cr_dailyavg) %>% as.Date()
+
+cr_dailyavg <- cr_dailyavg %>%
+  sapply(as.numeric) %>%
+  as.data.frame() %>%
+  mutate(servicedate = as.Date(servicedate),
+         cr_all = rowSums(.[,1:13], na.rm = T)) %>%
+  filter(servicedate >= "2022-08-01") %>%
+  mutate(ol_surge = case_when(servicedate >= "2022-08-19" ~ "surge",
+                              servicedate < "2022-08-19" ~ "pre-surge")) %>%
+  group_by(ol_surge) %>%
+  summarise(CR = mean(cr_all))
+
+# FOR TESTING, REMOVE AFTER
+# cr_dailyavg[2,2] <- 73000
+
+
+copley_dailyavg <- gated_station %>%
+  mutate(servicedate = as.Date(servicedate, format = "%m/%d/%Y")) %>%
+  filter(stationname == "Copley",
+         servicedate >= "2022-08-01",
+         wday(servicedate) > 1 & wday(servicedate) < 7) %>%
+  mutate(ol_surge = case_when(servicedate >= "2022-08-19" ~ "surge",
+                              servicedate < "2022-08-19" ~ "pre-surge")) %>%
+  group_by(ol_surge) %>%
+  summarise(Copley = mean(validations))
+
+
+govt_dailyavg <- gated_station %>%
+  mutate(servicedate = as.Date(servicedate, format = "%m/%d/%Y")) %>%
+  filter(stationname == "Government Center",
+         servicedate >= "2022-08-01",
+         wday(servicedate) > 1 & wday(servicedate) < 7) %>%
+  mutate(ol_surge = case_when(servicedate >= "2022-08-19" ~ "surge",
+                              servicedate < "2022-08-19" ~ "pre-surge")) %>%
+  group_by(ol_surge) %>%
+  summarise(`Gov't Center` = mean(validations))
+
+
+
+# join the modes together
+ol_alternatives <- bus_dailyavg %>%
+  full_join(cr_dailyavg) %>%
+  full_join(copley_dailyavg) %>%
+  full_join(govt_dailyavg) %>%
+  full_join(ol_dailyavg)
+
+
+#temporary until new bus data comes in
+#ol_alternatives[2,2:8] <- 8000
+
+#calculate unaccounted for OL riders
+# ol_alternatives[2,12] <- as.numeric(ol_alternatives[1,12]) - 
+#                          as.numeric(sum(ol_alternatives[2,2:11]))
+
+  
+ol_alternatives_long <- ol_alternatives %>%
+  pivot_longer(cols = c("Rt 4","Rt 39","Rt 41","Rt 42","Rt 43",
+                        "Rt 91","Rt 92","Rt 93","Rt CT2","SL5","SL4",
+                        "CR","Copley","Gov't Center","ol_avg"))
+
+ol_lost <- ol_alternatives[1,16] - ol_alternatives[2,16]
+
+
+ol_alternatives_change <- ol_alternatives_long %>%
+  pivot_wider(id_cols = "name",names_from = "ol_surge") %>%
+  mutate(axis1 = "Orange Line",
+         ridership_change = surge - `pre-surge`) %>%
+  mutate(ridership_capture = (ridership_change / ol_lost[1,1])*100) %>%
+  arrange(desc(ridership_capture)) %>%
+  mutate(pos = seq(14,0, by = -1),
+         color = case_when(name %in% c("Rt 4","Rt 39","Rt 41","Rt 42","Rt 43",
+                                       "Rt 91","Rt 92","Rt 93","Rt CT2") ~ "#FFC72C",
+                           name %in% c("SL4","SL5") ~ "#7C878E",
+                           name %in% c("CR") ~ "#80276C",
+                           name %in% c("Copley","Gov't Center") ~ "#4A4F5C"),
+         mode = case_when(name %in% c("Rt 4","Rt 39","Rt 41","Rt 42","Rt 43",
+                                       "Rt 91","Rt 92","Rt 93","Rt CT2") ~ "Bus",
+                           name %in% c("SL4","SL5") ~ "Silver Line",
+                           name %in% c("CR") ~ "Commuter Rail",
+                           name %in% c("Copley","Gov't Center") ~ "Subway")) 
+
+
+ol_other <- c("Other",
+              0,
+              -sum(ol_alternatives_change$ridership_change),
+              "Orange Line",
+              -sum(ol_alternatives_change$ridership_change),
+              0,0,"black","Other\n(shuttle, bike/drive,\nno commute)") %>%
+  t() %>% 
+  as.data.frame()
+
+
+colnames(ol_other) <- colnames(ol_alternatives_change)
+
+ol_other$`pre-surge`<- as.numeric(ol_other$`pre-surge`)
+ol_other$surge <- as.numeric(ol_other$surge)
+ol_other$ridership_change <- as.numeric(ol_other$ridership_change)
+ol_other$ridership_capture <- as.numeric(ol_other$ridership_capture)
+ol_other$pos <- as.numeric(ol_other$pos)
+
+ol_alternatives_change <- ol_alternatives_change %>%
+  rbind(ol_other) %>%
+  filter(name != "ol_avg")
+
+
+ol_alternatives_change$name <- factor(ol_alternatives_change$name,
+                                      levels=ol_alternatives_change$name
+                                      [order(desc(ol_alternatives_change$ridership_change))],
+                                      ordered=TRUE)
+
+ol_alternatives_change$mode <- factor(ol_alternatives_change$mode,
+                                      levels=c("Bus","Commuter Rail",
+                                               "Silver Line","Subway",
+                                               "Other\n(shuttle, bike/drive,\nno commute)"),
+                                      ordered=TRUE)
+
+
+              # ol_alternatives_long[which(ol_alternatives_long$ol_surge == "surge" &
+              #                              ol_alternatives_long$name == "ol_avg"),3]
+
+
+
+
+
+# colors for MBTA
+# opmi_rl = "#DA291C",
+#     opmi_ol = "#ED8B00",
+#     opmi_gl = "#00843D",
+#     opmi_bl = "#003DA5",
+#     opmi_bus = "#FFC72C",
+#     opmi_ferry = "#008EAA",
+#     opmi_cr = "#80276C",
+#     opmi_sl = "#7C878E",
+#     opmi_ride = "#52BBc5",
+#     opmi_subway = "#4A4F5C"
+
+
+```
+
+# Plot OL Surge
+
+```{r}
+ggplot(ol_alternatives_long) + # %>% filter(ol_surge == "pre-surge")) +
+  geom_col(aes(x = name, y = value, fill = ol_surge), position = "dodge") +
+  scale_fill_viridis_d()
+
+
+ggplot(ol_alternatives_change %>% filter(name != "ol_avg")) +
+  geom_segment(aes(x = pos, xend = pos, 
+                   y = 0, yend = ridership_capture), 
+               color = ol_alternatives_change$color,
+               size = 2) +
+  geom_point(aes(x = pos, y = 0),
+             color = ol_alternatives_change$color,
+             size = 2) +
+  geom_point(aes(x = pos, y = ridership_capture), 
+             color = ol_alternatives_change$color,
+             size = 4) +
+  coord_flip() +
+  scale_x_continuous(breaks = ol_alternatives_change$pos,
+                     labels = ol_alternatives_change$name,
+                     name = NULL) +
+  scale_y_continuous(breaks = seq(0,20,by=2),
+                     name = "Percent OL Ridership Captured") +
+  geom_text(label = paste0("+",
+                           prettyNum(plyr::round_any(ol_alternatives_change$ridership_change,
+                                                     100,
+                                                     f = round),
+                                     big.mark = ","),
+                           " riders"),
+            aes(x = pos + .4,
+                y = ridership_capture/2)) +
+  theme_minimal()
+
+ggsave("ol_ridership_alternative.jpg", height = 4, width = 8)
+
+
+
+
+```
+
+
+# alluvial
+```{r}
+
+
+
+alluvial_text <- rbind(c("mode","label","x","y"),
+                       c("Orange Line",paste0(
+                         prettyNum(plyr::round_any(ol_alternatives_long[11,3] %>%
+                                                     as.numeric(),100,round),
+                                   big.mark = ",")," riders"),
+                         1, 33000)) %>%
+  as.data.frame()
+
+colnames(alluvial_text) <- alluvial_text[1,]
+
+alluvial_text <- alluvial_text %>%
+  .[-1,]
+
+tmp <- cbind(ol_alternatives_change %>%
+  group_by(mode) %>%
+  summarise(label = prettyNum(plyr::round_any(sum(ridership_change),100,round),big.mark = ",")),
+  c(2,2,2,2,2),
+  c(54000,39000,19000,6500,1400)) %>%
+  mutate(label = paste0("+",label," riders"))
+colnames(tmp) <- colnames(alluvial_text)
+ 
+alluvial_text <- alluvial_text %>%
+  rbind(tmp)
+
+alluvial_text$x <- as.numeric(alluvial_text$x)
+alluvial_text$y <- as.numeric(alluvial_text$y)
+
+
+ggplot(data = ol_alternatives_change,
+       aes(axis1 = axis1, axis2 = mode, axis3 = name, y = ridership_change)) +
+  geom_alluvium(aes(fill = name), color = "white",
+                curve_type = "quintic", show.legend = F) +
+  geom_stratum(color = "white", aes(fill = color), show.legend = F) +
+  geom_text(stat = "stratum",
+            aes(label = after_stat(stratum)), size = 4, color = "white") +
+  # scale_x_discrete(limits = c("Survey", "Response"),
+  #                  expand = c(0.3, 0.0)) +
+  scale_fill_manual(values = c("#4A4F5C","#7C878E","#80276C","#FFC72C","darkcyan","#4A4F5C",
+                               "#80276C",
+                               "#4A4F5C","darkcyan",
+                               "#FFC72C","#FFC72C","#FFC72C","#FFC72C","#FFC72C",
+                               "#7C878E","#7C878E","yellow","yellow","yellow","yellow")) +
+  geom_text(data = alluvial_text,
+            label = alluvial_text$label,
+            aes(x = x,
+                y = y),
+            inherit.aes = F, 
+            size = 3.5, fontface = "italic", color = "white", family = "Calibri") +
+  theme_void() 
+
+
+ggsave("ol_surge_alluvial.jpg", height = 6, width = 9.5)
+
+```
 
 
 
